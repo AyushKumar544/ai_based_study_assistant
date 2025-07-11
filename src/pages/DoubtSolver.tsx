@@ -11,7 +11,7 @@ import {
   Search
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
-import axios from 'axios';
+import { doubtService } from '../services/doubtService';
 import toast from 'react-hot-toast';
 
 interface Doubt {
@@ -33,7 +33,6 @@ interface DoubtSolution {
   subject: string;
 }
 
-const API_BASE_URL = 'http://localhost:3001';
 
 export default function DoubtSolver() {
   const [question, setQuestion] = useState('');
@@ -51,26 +50,13 @@ export default function DoubtSolver() {
   const fetchDoubtsHistory = async () => {
     try {
       console.log('🔍 Fetching doubts history...');
-      const token = localStorage.getItem('token');
+      const doubts = await doubtService.getDoubtHistory();
       
-      if (!token) {
-        console.log('No token found, skipping history fetch');
-        return;
-      }
-
-      const response = await axios.get(`${API_BASE_URL}/api/doubts/history`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      console.log('✅ Doubts history fetched:', response.data);
-      setDoubtsHistory(response.data.doubts || []);
+      console.log('✅ Doubts history fetched:', doubts);
+      setDoubtsHistory(doubts || []);
     } catch (error: any) {
       console.error('❌ Failed to fetch doubts history:', error);
-      if (error.response?.status !== 401) {
-        toast.error('Failed to load history');
-      }
+      toast.error('Failed to load history');
     }
   };
 
@@ -80,45 +66,23 @@ export default function DoubtSolver() {
       return;
     }
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      toast.error('Please login first');
-      return;
-    }
-
     setIsLoading(true);
     setSolution(null);
 
     try {
       console.log('🤔 Asking doubt:', { question, subject, context });
       
-      const response = await axios.post(`${API_BASE_URL}/api/doubts/ask`, {
-        question,
-        subject: subject || 'General',
-        context
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const doubt = await doubtService.askDoubt(question, subject || 'General', context);
 
-      console.log('✅ Doubt solution received:', response.data);
-      setSolution(response.data.solution);
+      console.log('✅ Doubt solution received:', doubt);
+      setSolution(doubt.solution);
       setQuestion('');
       setContext('');
       fetchDoubtsHistory();
       toast.success('Your doubt has been solved!');
     } catch (error: any) {
       console.error('❌ Failed to solve doubt:', error);
-      
-      if (error.response?.status === 401) {
-        toast.error('Please login to ask questions');
-      } else if (error.response?.status === 500) {
-        toast.error('Server error. Please try again later.');
-      } else {
-        toast.error(error.response?.data?.message || 'Failed to solve doubt');
-      }
+      toast.error('Failed to solve doubt');
     } finally {
       setIsLoading(false);
     }
@@ -126,19 +90,9 @@ export default function DoubtSolver() {
 
   const viewDoubtSolution = async (doubtId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please login first');
-        return;
-      }
-
-      const response = await axios.get(`${API_BASE_URL}/api/doubts/${doubtId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const doubt = await doubtService.getDoubtById(doubtId);
       
-      setSolution(response.data.solution);
+      setSolution(doubt.solution);
       setShowHistory(false);
     } catch (error: any) {
       console.error('❌ Failed to load doubt solution:', error);

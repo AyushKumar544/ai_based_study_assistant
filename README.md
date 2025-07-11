@@ -38,6 +38,7 @@ A comprehensive AI-powered study assistant application to help students learn mo
 
 ### Prerequisites
 - Node.js (v16 or higher)
+- Supabase account (free tier available)
 - Git
 
 ### 1. Clone the Repository
@@ -60,100 +61,46 @@ npm install
 cd ..
 ```
 
-### 3. Environment Configuration
+### 3. Supabase Setup
 
-1. **Copy environment file**:
+1. **Create a Supabase Project**:
+   - Go to [Supabase](https://supabase.com)
+   - Create a new project
+   - Wait for the project to be ready
+
+2. **Get your Supabase credentials**:
+   - Go to Project Settings → API
+   - Copy your Project URL and anon public key
+
+3. **Set up the database**:
+   - Go to the SQL Editor in your Supabase dashboard
+   - Copy and run the SQL from `supabase/migrations/001_initial_schema.sql`
+   - This will create all necessary tables and security policies
+
+### 4. Environment Configuration
+
+1. **Create environment file**:
    ```bash
-   cd server
    cp .env.example .env
    ```
 
-2. **Edit `.env` file** with your configuration:
+2. **Edit `.env` file** with your Supabase credentials:
    ```env
-   # JWT Secret (Generate a strong secret key)
-   JWT_SECRET=your_super_secret_jwt_key_here_make_it_long_and_random
-
-   # Email Configuration (Optional - for password reset and verification)
-   EMAIL_USER=your_email@gmail.com
-   EMAIL_PASS=your_app_password
-
-   # Client URL
-   CLIENT_URL=http://localhost:5173
-
-   # Server Port
-   PORT=3001
-
-   # AI API Configuration (Choose one)
-   # OpenAI Configuration
-   OPENAI_API_KEY=your_openai_api_key_here
-   OPENAI_MODEL=gpt-3.5-turbo
-
-   # Hugging Face Configuration (Alternative to OpenAI)
-   HUGGINGFACE_API_KEY=your_huggingface_api_key_here
-   HUGGINGFACE_MODEL=microsoft/DialoGPT-medium
-
-   # Roq Configuration (Alternative AI service)
-   ROQ_API_KEY=your_roq_api_key_here
-   ROQ_API_URL=https://api.roq.ai
-
-   # AI Service Provider (openai, huggingface, roq, or mock)
-   AI_PROVIDER=mock
+   # Supabase Configuration
+   VITE_SUPABASE_URL=your_supabase_project_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
-### 4. AI Service Setup (Optional)
+### 5. Start the Application
 
-The app works with mock AI services by default. To enable real AI features:
-
-#### Option 1: OpenAI (Recommended)
-1. Get API key from [OpenAI](https://platform.openai.com/api-keys)
-2. Set `OPENAI_API_KEY` and `AI_PROVIDER=openai` in `.env`
-
-#### Option 2: Hugging Face
-1. Get API key from [Hugging Face](https://huggingface.co/settings/tokens)
-2. Set `HUGGINGFACE_API_KEY` and `AI_PROVIDER=huggingface` in `.env`
-
-#### Option 3: Roq
-1. Get API key from your Roq provider
-2. Set `ROQ_API_KEY` and `AI_PROVIDER=roq` in `.env`
-
-### 5. Email Setup (Optional)
-
-For password reset and email verification features:
-
-1. **Gmail Setup**:
-   - Enable 2-factor authentication on your Gmail account
-   - Generate an App Password: Google Account → Security → App passwords
-   - Use the app password in the `EMAIL_PASS` field
-
-### 6. Start the Application
-
-#### Option 1: Start Both Services Separately
-
-**Terminal 1 - Backend**:
-```bash
-cd server
-npm run dev
-```
-
-**Terminal 2 - Frontend**:
 ```bash
 npm run dev
 ```
 
-#### Option 2: Start Backend from Frontend (Alternative)
-```bash
-npm run server
-```
-Then in another terminal:
-```bash
-npm run dev
-```
+### 6. Access the Application
 
-### 7. Access the Application
-
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3001
-- **Health Check**: http://localhost:3001/api/health
+- **Application**: http://localhost:5173
+- **Supabase Dashboard**: Your Supabase project dashboard
 
 ## 📁 Project Structure
 
@@ -162,66 +109,47 @@ study-assistant-app/
 ├── src/                          # Frontend source code
 │   ├── components/              # Reusable React components
 │   ├── contexts/               # React contexts (Auth, etc.)
+│   ├── lib/                    # Supabase client and utilities
 │   ├── pages/                  # Page components
+│   ├── services/               # API service functions
 │   └── main.tsx               # App entry point
-├── server/                     # Backend source code
-│   ├── server.js              # Express server
-│   ├── ai-service.js          # AI service integration
-│   ├── package.json           # Backend dependencies
-│   └── .env.example           # Environment variables template
+├── supabase/                   # Supabase configuration
+│   ├── config.toml            # Supabase local config
+│   └── migrations/            # Database migrations
 ├── public/                     # Static assets
 ├── package.json               # Frontend dependencies
+├── .env.example               # Environment variables template
 └── README.md                  # This file
 ```
 
-## 🔌 API Endpoints
+## 🗄️ Database Features
 
-### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current user
-- `PUT /api/auth/update-profile` - Update user profile
-- `POST /api/auth/forgot-password` - Password reset request
+### Supabase Integration
+- **Authentication**: Built-in user authentication with email/password
+- **Real-time**: Real-time subscriptions for collaborative features
+- **Row Level Security**: Secure data access with RLS policies
+- **Edge Functions**: Serverless functions for AI integrations
+- **Storage**: File storage for user uploads
 
-### AI Services
-- `POST /api/ai/generate-study-plan` - Generate personalized study plan
-- `POST /api/ai/summarize` - Text summarization
-
-### Doubt Solver
-- `POST /api/doubts/ask` - Ask a question and get AI solution
-- `GET /api/doubts/history` - Get user's doubt history
-- `GET /api/doubts/:id` - Get specific doubt solution
-
-### Health Check
-- `GET /api/health` - Server health status and configuration
+### Database Tables
+- `users` - User profiles and study goals
+- `study_sessions` - Study session tracking
+- `goal_tracking` - Daily progress monitoring
+- `notifications` - User notifications
+- `flashcards` - Spaced repetition flashcards
+- `notes` - Study notes with tags
+- `study_groups` - Collaborative study groups
+- `study_group_members` - Group memberships
+- `doubts` - AI-powered doubt solving
 
 ## 💻 Development Commands
 
-### Frontend
 ```bash
 npm run dev          # Start development server
 npm run build        # Build for production
 npm run preview      # Preview production build
 npm run lint         # Run ESLint
 ```
-
-### Backend
-```bash
-cd server
-npm run dev          # Start development server with nodemon
-npm start            # Start production server
-```
-
-## 🗄️ Database Schema
-
-The application uses SQLite and automatically creates the following tables:
-- `users` - User accounts and profiles
-- `study_sessions` - Study session tracking
-- `flashcards` - Flashcard data
-- `notes` - User notes and study materials
-- `study_groups` - Study group information
-- `study_group_members` - Study group memberships
-- `doubts` - User questions and AI solutions
 
 ## 🎯 Features by User Category
 
@@ -249,40 +177,40 @@ The application uses SQLite and automatically creates the following tables:
 
 ### Common Issues
 
-1. **Backend Connection Error**:
-   - Ensure backend server is running on port 3001
-   - Check if JWT_SECRET is set in `.env`
-   - Verify all dependencies are installed
+1. **Supabase Connection Error**:
+   - Verify your Supabase URL and anon key in `.env`
+   - Check if your Supabase project is active
+   - Ensure you've run the database migrations
 
-2. **AI Features Not Working**:
-   - Check AI_PROVIDER setting in `.env`
-   - Verify API keys are correct
-   - App falls back to mock services automatically
+2. **Authentication Issues**:
+   - Check Supabase Auth settings in your dashboard
+   - Verify email confirmation is disabled for development
+   - Check browser console for detailed error messages
 
-3. **Email Not Working**:
-   - Verify email credentials in `.env`
-   - Check Gmail app password setup
-   - Email features are optional for basic functionality
+3. **Database Errors**:
+   - Ensure you've run the SQL migration in Supabase
+   - Check Row Level Security policies are properly set
+   - Verify user permissions in Supabase dashboard
 
 4. **Frontend Not Loading**:
    - Ensure all dependencies are installed: `npm install`
-   - Check if backend is running
-   - Verify CORS configuration
+   - Check environment variables are set correctly
+   - Clear browser cache and localStorage
 
 ### Development Tips
 
 1. **Database Reset**:
-   ```bash
-   rm server/study_assistant.db
-   # Restart server to recreate database
-   ```
+   - Go to Supabase SQL Editor
+   - Drop tables and re-run the migration SQL
+   - Or reset from Supabase dashboard
 
 2. **Clear Browser Data**:
    - Clear localStorage and cookies for fresh start
 
 3. **Check Logs**:
-   - Backend logs appear in terminal
+   - Supabase logs in dashboard
    - Frontend errors in browser console
+   - Network tab for API call debugging
 
 ## 🤝 Contributing
 
@@ -300,15 +228,18 @@ This project is licensed under the MIT License.
 
 For issues and questions:
 1. Check the troubleshooting section
+2. Review Supabase documentation
 2. Review the code comments
 3. Create an issue in the repository
 
 ## 🚀 Future Enhancements
 
-- Real-time collaboration features
+- Enhanced real-time collaboration
 - Mobile app development
-- Advanced AI tutoring
+- Advanced AI tutoring with OpenAI integration
 - Integration with learning management systems
 - Offline functionality
 - Voice-to-text note taking
-- Advanced analytics dashboard
+- Advanced analytics with custom charts
+- Push notifications
+- File sharing in study groups

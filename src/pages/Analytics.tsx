@@ -31,10 +31,9 @@ import {
   AreaChart
 } from 'recharts';
 import Navbar from '../components/Navbar';
-import axios from 'axios';
+import { studySessionService } from '../services/studySessionService';
 import toast from 'react-hot-toast';
 
-const API_BASE_URL = 'http://localhost:3001';
 
 interface AnalyticsOverview {
   totalStudyTime: number;
@@ -85,40 +84,88 @@ export default function Analytics() {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
       
-      if (!token) {
-        toast.error('Please login to view analytics');
-        return;
-      }
-
-      const headers = { 'Authorization': `Bearer ${token}` };
-
-      // Fetch all analytics data in parallel
-      const [overviewRes, trendRes, subjectRes, performanceRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/analytics/overview?timeRange=${timeRange}`, { headers }),
-        axios.get(`${API_BASE_URL}/api/analytics/study-trend?timeRange=${timeRange}`, { headers }),
-        axios.get(`${API_BASE_URL}/api/analytics/subject-distribution?timeRange=${timeRange}`, { headers }),
-        axios.get(`${API_BASE_URL}/api/analytics/performance-score`, { headers })
+      // Fetch analytics data from Supabase
+      const [analyticsData, sessions] = await Promise.all([
+        studySessionService.getAnalytics(timeRange as 'week' | 'month' | 'year'),
+        studySessionService.getUserSessions(timeRange as 'week' | 'month' | 'year')
       ]);
 
-      setOverview(overviewRes.data);
-      setStudyTrend(trendRes.data);
-      setSubjectData(subjectRes.data);
-      setPerformanceData(performanceRes.data);
-
+      setOverview(analyticsData);
+      
+      // Process sessions for trend data
+      const trendData = processTrendData(sessions, timeRange);
+      setStudyTrend(trendData);
+      
+      // Process sessions for subject distribution
+      const subjectDistribution = processSubjectData(sessions);
+      setSubjectData(subjectDistribution);
+      
+      // Mock performance data for now
+      const mockPerformanceData = Array.from({ length: 7 }, (_, i) => ({
+        week: `Week ${i + 1}`,
+        score: Math.floor(Math.random() * 40) + 60
+      }));
+      setPerformanceData(mockPerformanceData);
     } catch (error: any) {
       console.error('Failed to fetch analytics:', error);
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        toast.error('Session expired. Please login again.');
-      } else {
-        toast.error('Failed to load analytics data');
-      }
+      toast.error('Failed to load analytics data');
     } finally {
       setLoading(false);
     }
   };
 
+  const processTrendData = (sessions: any[], timeRange: string) => {
+    const days = timeRange === 'week' ? 7 : timeRange === 'month' ? 30 : 365;
+    const result = [];
+    const now = new Date();
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const daySessions = sessions.filter(session => 
+        session.created_at.split('T')[0] === dateStr
+      );
+      
+      const totalMinutes = daySessions.reduce((sum, session) => sum + session.duration, 0);
+      
+      result.push({
+        date: dateStr,
+        hours: Math.round(totalMinutes / 60 * 10) / 10,
+        sessions: daySessions.length
+      });
+    }
+    
+    return result;
+  };
+
+  const processSubjectData = (sessions: any[]) => {
+    const subjectMap = new Map();
+    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
+    
+    sessions.forEach(session => {
+      const subject = session.subject;
+      if (subjectMap.has(subject)) {
+        const existing = subjectMap.get(subject);
+        existing.hours += session.duration / 60;
+        existing.sessions += 1;
+      } else {
+        subjectMap.set(subject, {
+          subject,
+          hours: session.duration / 60,
+          sessions: 1,
+          color: colors[subjectMap.size % colors.length]
+        });
+      }
+    });
+    
+    return Array.from(subjectMap.values()).map(item => ({
+      ...item,
+      hours: Math.round(item.hours * 10) / 10
+    }));
+  };
   const getStreakMessage = (days: number) => {
     if (days === 0) return "Start your streak today! 🚀";
     if (days === 1) return "Great start! Keep it going! 💪";

@@ -4,10 +4,9 @@ import { Play, Pause, RotateCcw, Settings, Coffee, BookOpen, Save } from 'lucide
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
 import Navbar from '../components/Navbar';
-import axios from 'axios';
+import { studySessionService } from '../services/studySessionService';
 import toast from 'react-hot-toast';
 
-const API_BASE_URL = 'http://localhost:3001';
 
 export default function StudyTimer() {
   const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
@@ -65,22 +64,12 @@ export default function StudyTimer() {
 
   const saveStudySession = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      const duration = settings.studyTime; // Duration in minutes
-      const goalProgress = Math.random() * 20 + 80; // Mock progress between 80-100%
-
-      await axios.post(`${API_BASE_URL}/api/study-sessions`, {
+      await studySessionService.createSession({
         subject: currentSubject,
-        duration: duration,
+        duration: settings.studyTime,
         sessionType: 'focus',
         notes: sessionNotes,
-        goalProgress: goalProgress
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        goal_progress: Math.random() * 20 + 80 // Mock progress between 80-100%
       });
 
       console.log('Study session saved successfully');
@@ -124,26 +113,15 @@ export default function StudyTimer() {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        toast.error('Please login to save sessions');
-        return;
-      }
-
       const now = new Date();
       const duration = Math.round((now.getTime() - sessionStartTime.getTime()) / (1000 * 60)); // Duration in minutes
-      const goalProgress = Math.random() * 20 + 80; // Mock progress between 80-100%
 
-      await axios.post(`${API_BASE_URL}/api/study-sessions`, {
+      await studySessionService.createSession({
         subject: currentSubject,
-        duration: duration,
+        duration,
         sessionType: 'focus',
         notes: sessionNotes,
-        goalProgress: goalProgress
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        goal_progress: Math.random() * 20 + 80
       });
 
       toast.success('Study session saved successfully!');

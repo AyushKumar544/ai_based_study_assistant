@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import axios, { AxiosError } from 'axios';
+import { supabase } from '../lib/supabase';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 import toast from 'react-hot-toast';
 
 interface User {
@@ -37,43 +38,16 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE_URL = 'http://localhost:3001/api';
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: true
-});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [serverConnected, setServerConnected] = useState(false);
+  const [serverConnected, setServerConnected] = useState(true); // Supabase is always connected
 
   const checkServerConnection = useCallback(async (showToast = false): Promise<boolean> => {
-    try {
-      const response = await api.get('/health');
-      if (response.data?.status === 'OK') {
-        setServerConnected(true);
-        return true;
-      }
-      throw new Error('Server not healthy');
-    } catch (error) {
-      setServerConnected(false);
-      console.error('Server connection check failed:', error);
-      
-      if (showToast) {
-        toast.error('Cannot connect to server. Please try again later.', {
-          id: 'server-connection-error',
-          duration: 5000
-        });
-      }
-      
-      return false;
-    }
+    // Supabase connection is always available
+    setServerConnected(true);
+    return true;
   }, []);
 
   const retryServerConnection = useCallback(async () => {
@@ -83,48 +57,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [checkServerConnection]);
 
   const handleApiError = useCallback((error: unknown): string => {
-    if (axios.isAxiosError(error)) {
-      console.error('Axios Error Details:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        config: error.config
-      });
-
-      if (error.code === 'ECONNABORTED') {
-        return 'Request timeout. Please check your connection.';
-      }
-
-      if (!error.response) {
-        return 'Network error. Please check your internet connection.';
-      }
-
-      // Handle server validation errors
-      if (error.response.status === 400 && error.response.data?.errors) {
-        return Object.values(error.response.data.errors).join('\n');
-      }
-
-      if (error.response.data?.message) {
-        return error.response.data.message;
-      }
-
-      switch (error.response.status) {
-        case 401:
-          return 'Session expired. Please login again.';
-        case 403:
-          return 'Access denied. Please check your credentials.';
-        case 404:
-          return 'Resource not found.';
-        case 500:
-          return 'Server error. Please try again later.';
-        default:
-          return 'An unexpected error occurred.';
-      }
-    }
-
     if (error instanceof Error) {
       return error.message;
     }
-
     return 'An unknown error occurred';
   }, []);
 
@@ -134,42 +69,93 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const initializeAuth = useCallback(async () => {
-    const isConnected = await checkServerConnection();
-    
-    if (!isConnected) {
-      setLoading(false);
-      return;
-    }
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // Fetch user profile from our users table
+        const { data: profile, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
 
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const response = await api.get('/auth/me', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setUser(response.data.user);
-        setServerConnected(true);
-      } catch (error) {
-        console.error('Failed to fetch user:', error);
-        localStorage.removeItem('token');
-        if (axios.isAxiosError(error) && error.response?.status === 403) {
-          toast.error('Session expired. Please login again.', {
-            duration: 5000,
-            style: { background: '#ef4444', color: 'white' }
+        if (error) {
+          console.error('Failed to fetch user profile:', error);
+        } else if (profile) {
+          setUser({
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            category: profile.category,
+            branch: profile.branch,
+            domain: profile.domain,
+            currentGpa: profile.current_gpa,
+            expectedGpa: profile.expected_gpa,
+            currentStudyHours: profile.current_study_hours,
+            expectedStudyHours: profile.expected_study_hours,
+            currentSelfRating: profile.current_self_rating,
+            expectedSelfRating: profile.expected_self_rating,
+            targetDate: profile.target_date,
+            improvementAreas: profile.improvement_areas,
+            motivation: profile.motivation,
+            goalStartDate: profile.goal_start_date,
+            goalEndDate: profile.goal_end_date,
+            aiStudyPlan: profile.ai_study_plan,
+            setupComplete: profile.setup_complete
           });
         }
       }
+    } catch (error) {
+      console.error('Failed to initialize auth:', error);
     }
+    
     setLoading(false);
-  }, [checkServerConnection]);
+  }, []);
 
   useEffect(() => {
     initializeAuth();
 
-    const interval = setInterval(() => checkServerConnection(), 30000);
-    return () => clearInterval(interval);
-  }, [initializeAuth, checkServerConnection]);
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Fetch user profile
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
 
+        if (profile) {
+          setUser({
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            category: profile.category,
+            branch: profile.branch,
+            domain: profile.domain,
+            currentGpa: profile.current_gpa,
+            expectedGpa: profile.expected_gpa,
+            currentStudyHours: profile.current_study_hours,
+            expectedStudyHours: profile.expected_study_hours,
+            currentSelfRating: profile.current_self_rating,
+            expectedSelfRating: profile.expected_self_rating,
+            targetDate: profile.target_date,
+            improvementAreas: profile.improvement_areas,
+            motivation: profile.motivation,
+            goalStartDate: profile.goal_start_date,
+            goalEndDate: profile.goal_end_date,
+            aiStudyPlan: profile.ai_study_plan,
+            setupComplete: profile.setup_complete
+          });
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [initializeAuth]);
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     try {
       setLoading(true);
@@ -191,38 +177,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      const response = await api.post('/auth/login', 
-        { 
-          email: emailTrimmed.toLowerCase(), 
-          password: passwordTrimmed 
-        },
-        {
-          validateStatus: (status) => status < 500
-        }
-      );
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailTrimmed.toLowerCase(),
+        password: passwordTrimmed
+      });
 
-      if (response.status === 200) {
-        const { token, user } = response.data;
-        localStorage.setItem('token', token);
-        setUser(user);
-        setServerConnected(true);
-        
-        toast.success('Login successful!', {
-          style: { background: '#10b981', color: 'white' }
-        });
-        return true;
-      }
-
-      if (response.status === 400) {
-        const errorMessage = response.data?.message || 'Invalid email or password';
-        toast.error(errorMessage, {
+      if (error) {
+        toast.error(error.message, {
           duration: 5000,
           style: { background: '#ef4444', color: 'white' }
         });
         return false;
       }
 
-      throw new Error(response.data?.message || 'Login failed');
+      if (data.user) {
+        toast.success('Login successful!', {
+          style: { background: '#10b981', color: 'white' }
+        });
+        return true;
+      }
+
+      return false;
 
     } catch (error) {
       console.error('Login error:', error);
@@ -266,36 +241,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      const response = await api.post('/auth/register', {
-        name: nameTrimmed,
+      const { data, error } = await supabase.auth.signUp({
         email: emailTrimmed.toLowerCase(),
-        password: passwordTrimmed
-      }, {
-        validateStatus: (status) => status < 500
+        password: passwordTrimmed,
+        options: {
+          data: {
+            name: nameTrimmed
+          }
+        }
       });
 
-      if (response.status === 201) {
-        const { token, user } = response.data;
-        localStorage.setItem('token', token);
-        setUser(user);
-        setServerConnected(true);
-        
-        toast.success('Registration successful!', {
-          style: { background: '#10b981', color: 'white' }
-        });
-        return true;
-      }
-
-      if (response.status === 400) {
-        const errorMessage = response.data?.message || 'Registration failed';
-        toast.error(errorMessage, {
+      if (error) {
+        toast.error(error.message, {
           duration: 5000,
           style: { background: '#ef4444', color: 'white' }
         });
         return false;
       }
 
-      throw new Error(response.data?.message || 'Registration failed');
+      if (data.user) {
+        toast.success('Registration successful!', {
+          style: { background: '#10b981', color: 'white' }
+        });
+        return true;
+      }
+
+      return false;
 
     } catch (error) {
       console.error('Registration error:', error);
@@ -311,8 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [handleApiError]);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    setUser(null);
+    supabase.auth.signOut();
     toast.success('Logged out successfully', {
       style: { background: '#10b981', color: 'white' }
     });
@@ -322,31 +292,112 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       
-      const token = localStorage.getItem('token');
-      if (!token) {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
         toast.error('Please login first', {
           style: { background: '#ef4444', color: 'white' }
         });
         return false;
       }
 
-      // Ensure setupComplete is included if it's required by your backend
-      const payload = {
-        ...userData,
-        setupComplete: userData.setupComplete ?? user?.setupComplete ?? false
+      // Convert camelCase to snake_case for database
+      const dbPayload: any = {};
+      
+      if (userData.category) dbPayload.category = userData.category;
+      if (userData.branch) dbPayload.branch = userData.branch;
+      if (userData.domain) dbPayload.domain = userData.domain;
+      if (userData.currentGpa !== undefined) dbPayload.current_gpa = userData.currentGpa;
+      if (userData.expectedGpa !== undefined) dbPayload.expected_gpa = userData.expectedGpa;
+      if (userData.currentStudyHours !== undefined) dbPayload.current_study_hours = userData.currentStudyHours;
+      if (userData.expectedStudyHours !== undefined) dbPayload.expected_study_hours = userData.expectedStudyHours;
+      if (userData.currentSelfRating !== undefined) dbPayload.current_self_rating = userData.currentSelfRating;
+      if (userData.expectedSelfRating !== undefined) dbPayload.expected_self_rating = userData.expectedSelfRating;
+      if (userData.targetDate) dbPayload.target_date = userData.targetDate;
+      if (userData.improvementAreas) dbPayload.improvement_areas = userData.improvementAreas;
+      if (userData.motivation) dbPayload.motivation = userData.motivation;
+      if (userData.goalStartDate) dbPayload.goal_start_date = userData.goalStartDate;
+      if (userData.goalEndDate) dbPayload.goal_end_date = userData.goalEndDate;
+      if (userData.aiStudyPlan) dbPayload.ai_study_plan = userData.aiStudyPlan;
+      if (userData.setupComplete !== undefined) dbPayload.setup_complete = userData.setupComplete;
+      
+      dbPayload.updated_at = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from('users')
+        .update(dbPayload)
+        .eq('id', authUser.id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        // Update local user state
+        setUser(prev => ({
+          ...prev!,
+          category: data.category,
+          branch: data.branch,
+          domain: data.domain,
+          currentGpa: data.current_gpa,
+          expectedGpa: data.expected_gpa,
+          currentStudyHours: data.current_study_hours,
+          expectedStudyHours: data.expected_study_hours,
+          currentSelfRating: data.current_self_rating,
+          expectedSelfRating: data.expected_self_rating,
+          targetDate: data.target_date,
+          improvementAreas: data.improvement_areas,
+          motivation: data.motivation,
+          goalStartDate: data.goal_start_date,
+          goalEndDate: data.goal_end_date,
+          aiStudyPlan: data.ai_study_plan,
+          setupComplete: data.setup_complete
+        }));
+        
+        toast.success('Profile updated successfully!', {
+          style: { background: '#10b981', color: 'white' }
+        });
+        return true;
+      }
+
+      return false;
+
+    } catch (error) {
+      console.error('Update error:', error);
+      const errorMsg = handleApiError(error);
+      toast.error(errorMsg, {
+        duration: 5000,
+        style: { background: '#ef4444', color: 'white' }
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [handleApiError]);
       };
 
-      console.log('Sending update payload:', payload); // Debug log
+  const value: AuthContextType = {
+    user,
+    login,
+    register,
+    logout,
+    updateUser,
+    loading,
+    serverConnected,
+    retryServerConnection
+  };
 
-      const response = await api.put('/auth/update-profile', payload, {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        validateStatus: (status) => status < 500
-      });
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
-      console.log('Update response:', response.data); // Debug log
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
 
       if (response.status === 200) {
         setUser(prev => ({ ...prev, ...response.data.user }));
