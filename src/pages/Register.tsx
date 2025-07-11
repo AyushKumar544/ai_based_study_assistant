@@ -94,6 +94,8 @@ export default function Register() {
                 })}
                 type="email"
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Enter your email"
               />
@@ -119,6 +121,8 @@ export default function Register() {
                 })}
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect="off"
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Create a password"
               />
@@ -133,6 +137,9 @@ export default function Register() {
             {errors.password && (
               <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
             )}
+            <p className="mt-1 text-xs text-gray-500">
+              Password must be at least 6 characters long
+            </p>
           </div>
 
           <div>

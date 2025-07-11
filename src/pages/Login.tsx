@@ -64,6 +64,8 @@ export default function Login() {
                 })}
                 type="email"
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Enter your email"
               />
@@ -89,6 +91,8 @@ export default function Login() {
                 })}
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 placeholder="Enter your password"
               />
@@ -106,6 +110,9 @@ export default function Login() {
           </div>
 
           <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-600">
+              <span>Test account: test@example.com / password123</span>
+            </div>
             <Link
               to="/forgot-password"
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"

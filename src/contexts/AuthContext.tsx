@@ -239,6 +239,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: emailTrimmed.toLowerCase(),
         password: passwordTrimmed,
         options: {
+          emailRedirectTo: undefined, // Disable email confirmation
           data: {
             name: nameTrimmed
           }
@@ -252,11 +253,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data.user) {
+        // Check if email confirmation is required
+        if (data.user && !data.session) {
+          toast.error('Please check your email and confirm your account before logging in');
+          return false;
+        }
+
         console.log('✅ Registration successful');
         toast.success('Registration successful!');
         
-        // Wait for the auth state to update
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait for the auth state and profile to be created
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         return true;
       }
