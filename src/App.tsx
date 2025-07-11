@@ -45,7 +45,7 @@ function AppRoutes() {
 
   const getRedirectPath = () => {
     if (!user) return '/login';
-    if (!user.setupComplete) return '/target-setting';
+    // Always redirect to dashboard after login/signup
     return '/dashboard';
   };
 

@@ -24,7 +24,7 @@ export default function Register() {
   const onSubmit = async (data: RegisterForm) => {
     const success = await registerUser(data.name, data.email, data.password);
     if (success) {
-      navigate('/category-selection');
+      navigate('/dashboard');
     }
   };
 

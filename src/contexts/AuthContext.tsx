@@ -263,6 +263,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast.success('Registration successful!', {
           style: { background: '#10b981', color: 'white' }
         });
+        
+        // Wait a moment for the auth state to update, then redirect will happen automatically
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1000);
+        
         return true;
       }
 
