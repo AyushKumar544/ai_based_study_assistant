@@ -75,6 +75,7 @@ cd ..
 3. **Set up the database**:
    - Go to the SQL Editor in your Supabase dashboard
    - Copy and run the SQL from `supabase/migrations/001_initial_schema.sql`
+   - Then run the SQL from `supabase/migrations/002_auth_trigger.sql`
    - This will create all necessary tables and security policies
 
 ### 4. Environment Configuration

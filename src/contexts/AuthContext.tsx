@@ -260,6 +260,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data.user) {
+        // Wait a moment for the trigger to create the user profile
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Try to fetch the user profile to ensure it was created
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+
+          if (profileError || !profile) {
+            // If trigger didn't work, manually create the profile
+            console.log('Creating user profile manually...');
+            const { error: insertError } = await supabase
+              .from('users')
+              .insert({
+                id: data.user.id,
+                name: nameTrimmed,
+                email: emailTrimmed.toLowerCase(),
+                email_verified: true,
+                setup_complete: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+
+            if (insertError) {
+              console.error('Failed to create user profile:', insertError);
+              toast.error('Account created but profile setup failed. Please try logging in.', {
+                duration: 7000,
+                style: { background: '#f59e0b', color: 'white' }
+              });
+            }
+          } else {
+            console.log('User profile created successfully:', profile);
+          }
+        } catch (profileError) {
+          console.error('Error checking/creating user profile:', profileError);
+        }
+        
         toast.success('Registration successful!', {
           style: { background: '#10b981', color: 'white' }
         });
