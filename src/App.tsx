@@ -43,12 +43,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   const { user } = useAuth();
 
-  const getRedirectPath = () => {
-    if (!user) return '/login';
-    // Always redirect to dashboard after login/signup
-    return '/dashboard';
-  };
-
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -138,7 +132,7 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
-      <Route path="/" element={<Navigate to={getRedirectPath()} />} />
+      <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
     </Routes>
   );
 }

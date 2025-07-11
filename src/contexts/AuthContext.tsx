@@ -4,7 +4,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import toast from 'react-hot-toast';
 
 interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
   category?: string;
@@ -41,10 +41,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [serverConnected, setServerConnected] = useState(true); // Supabase is always connected
+  const [serverConnected, setServerConnected] = useState(true);
 
   const checkServerConnection = useCallback(async (showToast = false): Promise<boolean> => {
-    // Supabase connection is always available
     setServerConnected(true);
     return true;
   }, []);
@@ -67,94 +66,102 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return re.test(email);
   };
 
+  const fetchUserProfile = useCallback(async (userId: string): Promise<User | null> => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Failed to fetch user profile:', error);
+        return null;
+      }
+
+      if (profile) {
+        return {
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          category: profile.category,
+          branch: profile.branch,
+          domain: profile.domain,
+          currentGpa: profile.current_gpa,
+          expectedGpa: profile.expected_gpa,
+          currentStudyHours: profile.current_study_hours,
+          expectedStudyHours: profile.expected_study_hours,
+          currentSelfRating: profile.current_self_rating,
+          expectedSelfRating: profile.expected_self_rating,
+          targetDate: profile.target_date,
+          improvementAreas: profile.improvement_areas,
+          motivation: profile.motivation,
+          goalStartDate: profile.goal_start_date,
+          goalEndDate: profile.goal_end_date,
+          aiStudyPlan: profile.ai_study_plan,
+          setupComplete: profile.setup_complete
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+    return null;
+  }, []);
+
   const initializeAuth = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log('🔄 Initializing auth...');
+      const { data: { session }, error } = await supabase.auth.getSession();
       
-      if (session?.user) {
-        // Fetch user profile from our users table
-        const { data: profile, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+      if (error) {
+        console.error('Session error:', error);
+        setLoading(false);
+        return;
+      }
 
-        if (error) {
-          console.error('Failed to fetch user profile:', error);
-        } else if (profile) {
-          setUser({
-            id: profile.id,
-            name: profile.name,
-            email: profile.email,
-            category: profile.category,
-            branch: profile.branch,
-            domain: profile.domain,
-            currentGpa: profile.current_gpa,
-            expectedGpa: profile.expected_gpa,
-            currentStudyHours: profile.current_study_hours,
-            expectedStudyHours: profile.expected_study_hours,
-            currentSelfRating: profile.current_self_rating,
-            expectedSelfRating: profile.expected_self_rating,
-            targetDate: profile.target_date,
-            improvementAreas: profile.improvement_areas,
-            motivation: profile.motivation,
-            goalStartDate: profile.goal_start_date,
-            goalEndDate: profile.goal_end_date,
-            aiStudyPlan: profile.ai_study_plan,
-            setupComplete: profile.setup_complete
-          });
+      if (session?.user) {
+        console.log('✅ Session found, fetching profile...');
+        const profile = await fetchUserProfile(session.user.id);
+        if (profile) {
+          console.log('✅ Profile loaded:', profile.email);
+          setUser(profile);
+        } else {
+          console.log('❌ No profile found for user');
         }
+      } else {
+        console.log('ℹ️ No active session');
       }
     } catch (error) {
       console.error('Failed to initialize auth:', error);
     }
     
     setLoading(false);
-  }, []);
+  }, [fetchUserProfile]);
 
   useEffect(() => {
     initializeAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 Auth state changed:', event);
+      
       if (event === 'SIGNED_IN' && session?.user) {
-        // Fetch user profile
-        const { data: profile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
+        console.log('✅ User signed in, fetching profile...');
+        const profile = await fetchUserProfile(session.user.id);
         if (profile) {
-          setUser({
-            id: profile.id,
-            name: profile.name,
-            email: profile.email,
-            category: profile.category,
-            branch: profile.branch,
-            domain: profile.domain,
-            currentGpa: profile.current_gpa,
-            expectedGpa: profile.expected_gpa,
-            currentStudyHours: profile.current_study_hours,
-            expectedStudyHours: profile.expected_study_hours,
-            currentSelfRating: profile.current_self_rating,
-            expectedSelfRating: profile.expected_self_rating,
-            targetDate: profile.target_date,
-            improvementAreas: profile.improvement_areas,
-            motivation: profile.motivation,
-            goalStartDate: profile.goal_start_date,
-            goalEndDate: profile.goal_end_date,
-            aiStudyPlan: profile.ai_study_plan,
-            setupComplete: profile.setup_complete
-          });
+          console.log('✅ Profile set:', profile.email);
+          setUser(profile);
         }
       } else if (event === 'SIGNED_OUT') {
+        console.log('👋 User signed out');
         setUser(null);
       }
+      
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, [initializeAuth]);
+  }, [initializeAuth, fetchUserProfile]);
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     try {
@@ -164,36 +171,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const passwordTrimmed = password.trim();
       
       if (!validateEmail(emailTrimmed)) {
-        toast.error('Please enter a valid email address', {
-          style: { background: '#ef4444', color: 'white' }
-        });
+        toast.error('Please enter a valid email address');
         return false;
       }
       
       if (passwordTrimmed.length < 6) {
-        toast.error('Password must be at least 6 characters', {
-          style: { background: '#ef4444', color: 'white' }
-        });
+        toast.error('Password must be at least 6 characters');
         return false;
       }
 
+      console.log('🔄 Attempting login...');
       const { data, error } = await supabase.auth.signInWithPassword({
         email: emailTrimmed.toLowerCase(),
         password: passwordTrimmed
       });
 
       if (error) {
-        toast.error(error.message, {
-          duration: 5000,
-          style: { background: '#ef4444', color: 'white' }
-        });
+        console.error('Login error:', error);
+        toast.error(error.message);
         return false;
       }
 
       if (data.user) {
-        toast.success('Login successful!', {
-          style: { background: '#10b981', color: 'white' }
-        });
+        console.log('✅ Login successful');
+        toast.success('Login successful!');
+        // The auth state change listener will handle setting the user
         return true;
       }
 
@@ -202,10 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Login error:', error);
       const errorMsg = handleApiError(error);
-      toast.error(errorMsg, {
-        duration: 5000,
-        style: { background: '#ef4444', color: 'white' }
-      });
+      toast.error(errorMsg);
       return false;
     } finally {
       setLoading(false);
@@ -221,26 +220,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const passwordTrimmed = password.trim();
 
       if (nameTrimmed.length < 2) {
-        toast.error('Name must be at least 2 characters', {
-          style: { background: '#ef4444', color: 'white' }
-        });
+        toast.error('Name must be at least 2 characters');
         return false;
       }
 
       if (!validateEmail(emailTrimmed)) {
-        toast.error('Please enter a valid email address', {
-          style: { background: '#ef4444', color: 'white' }
-        });
+        toast.error('Please enter a valid email address');
         return false;
       }
 
       if (passwordTrimmed.length < 6) {
-        toast.error('Password must be at least 6 characters', {
-          style: { background: '#ef4444', color: 'white' }
-        });
+        toast.error('Password must be at least 6 characters');
         return false;
       }
 
+      console.log('🔄 Attempting registration...');
       const { data, error } = await supabase.auth.signUp({
         email: emailTrimmed.toLowerCase(),
         password: passwordTrimmed,
@@ -252,22 +246,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        toast.error(error.message, {
-          duration: 5000,
-          style: { background: '#ef4444', color: 'white' }
-        });
+        console.error('Registration error:', error);
+        toast.error(error.message);
         return false;
       }
 
       if (data.user) {
-        toast.success('Registration successful!', {
-          style: { background: '#10b981', color: 'white' }
-        });
+        console.log('✅ Registration successful');
+        toast.success('Registration successful!');
         
-        // Wait a moment for the auth state to update, then redirect will happen automatically
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 1000);
+        // Wait for the auth state to update
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         return true;
       }
@@ -277,21 +266,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Registration error:', error);
       const errorMsg = handleApiError(error);
-      toast.error(errorMsg, {
-        duration: 5000,
-        style: { background: '#ef4444', color: 'white' }
-      });
+      toast.error(errorMsg);
       return false;
     } finally {
       setLoading(false);
     }
   }, [handleApiError]);
 
-  const logout = useCallback(() => {
-    supabase.auth.signOut();
-    toast.success('Logged out successfully', {
-      style: { background: '#10b981', color: 'white' }
-    });
+  const logout = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      toast.success('Logged out successfully');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Failed to logout');
+    }
   }, []);
 
   const updateUser = useCallback(async (userData: Partial<User>): Promise<boolean> => {
@@ -300,9 +290,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) {
-        toast.error('Please login first', {
-          style: { background: '#ef4444', color: 'white' }
-        });
+        toast.error('Please login first');
         return false;
       }
 
@@ -361,9 +349,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setupComplete: data.setup_complete
         }));
         
-        toast.success('Profile updated successfully!', {
-          style: { background: '#10b981', color: 'white' }
-        });
+        toast.success('Profile updated successfully!');
         return true;
       }
 
@@ -372,10 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Update error:', error);
       const errorMsg = handleApiError(error);
-      toast.error(errorMsg, {
-        duration: 5000,
-        style: { background: '#ef4444', color: 'white' }
-      });
+      toast.error(errorMsg);
       return false;
     } finally {
       setLoading(false);

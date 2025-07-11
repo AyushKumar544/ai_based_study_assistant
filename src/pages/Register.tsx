@@ -24,7 +24,10 @@ export default function Register() {
   const onSubmit = async (data: RegisterForm) => {
     const success = await registerUser(data.name, data.email, data.password);
     if (success) {
-      navigate('/dashboard');
+      // Wait a moment for auth state to update, then navigate
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 500);
     }
   };
 

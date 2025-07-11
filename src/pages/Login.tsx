@@ -19,7 +19,10 @@ export default function Login() {
   const onSubmit = async (data: LoginForm) => {
     const success = await login(data.email, data.password);
     if (success) {
-      navigate('/dashboard');
+      // Wait a moment for auth state to update, then navigate
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 500);
     }
   };
 
