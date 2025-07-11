@@ -38,7 +38,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -156,6 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, [initializeAuth]);
+
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     try {
       setLoading(true);
@@ -375,61 +375,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, [handleApiError]);
-      };
-
-  const value: AuthContextType = {
-    user,
-    login,
-    register,
-    logout,
-    updateUser,
-    loading,
-    serverConnected,
-    retryServerConnection
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-
-      if (response.status === 200) {
-        setUser(prev => ({ ...prev, ...response.data.user }));
-        toast.success('Profile updated successfully!', {
-          style: { background: '#10b981', color: 'white' }
-        });
-        return true;
-      }
-
-      if (response.status === 400) {
-        const errorMessage = response.data?.message || 'Update failed';
-        toast.error(errorMessage, {
-          duration: 5000,
-          style: { background: '#ef4444', color: 'white' }
-        });
-        return false;
-      }
-
-      throw new Error(response.data?.message || 'Update failed');
-
-    } catch (error) {
-      console.error('Update error:', error);
-      const errorMsg = handleApiError(error);
-      toast.error(errorMsg, {
-        duration: 5000,
-        style: { background: '#ef4444', color: 'white' }
-      });
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [handleApiError, user?.setupComplete]);
 
   const value: AuthContextType = {
     user,
